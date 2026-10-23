@@ -80,6 +80,7 @@ function buildSudokuGrid() {
             input.dataset.row = r;
             input.dataset.col = c;
             input.autocomplete = 'off';
+            input.inputMode = 'numeric';
 
             // Cell Input Handler
             input.addEventListener('input', (e) => handleCellInput(e, r, c));
