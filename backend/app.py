@@ -160,10 +160,10 @@ def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
-@app.route("/<path:path>", methods=["GET"])
-def static_files(path):
-    """Serves static CSS, JS, and asset files securely from frontend/."""
-    return send_from_directory(FRONTEND_DIR, path)
+@app.route("/healthz", methods=["GET"])
+def health_check():
+    """Health check endpoint for Render and uptime monitoring."""
+    return jsonify({"status": "ok"}), 200
 
 
 # ==========================================
@@ -401,6 +401,19 @@ def compare():
     }), 200
 
 
+# ==========================================
+# Static Asset Catch-All Route (Placed after API endpoints)
+# ==========================================
+
+@app.route("/<path:path>", methods=["GET"])
+def static_files(path):
+    """Serves static CSS, JS, and asset files securely from frontend/."""
+    file_path = os.path.join(FRONTEND_DIR, path)
+    if os.path.isfile(file_path):
+        return send_from_directory(FRONTEND_DIR, path)
+    return jsonify({"status": "error", "message": "Not found"}), 404
+
+
 if __name__ == "__main__":
-    # Local dev server
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

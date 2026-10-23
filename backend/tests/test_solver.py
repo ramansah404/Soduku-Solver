@@ -264,6 +264,12 @@ class TestFlaskAPI(unittest.TestCase):
         self.assertIn(b"Sudoku AI", response.data)
         response.close()
 
+    def test_healthz_route(self):
+        response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["status"], "ok")
+
     def test_examples_route(self):
         response = self.client.get("/api/examples")
         self.assertEqual(response.status_code, 200)
