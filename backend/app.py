@@ -31,26 +31,16 @@ SOLVER_DIR = os.path.join(BASE_DIR, "backend", "solver")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR)
 
-# Configure CORS to allow deployed Vercel frontend or local development origins
-# Set ALLOWED_ORIGINS (or FRONTEND_URL) in production (e.g. "https://my-app.vercel.app")
-raw_allowed_origins = os.environ.get("ALLOWED_ORIGINS") or os.environ.get("FRONTEND_URL") or ""
-if raw_allowed_origins.strip():
+# Configure CORS to allow deployed Vercel frontend, Render, or local development origins
+raw_allowed_origins = os.environ.get("ALLOWED_ORIGINS") or os.environ.get("FRONTEND_URL") or "*"
+if raw_allowed_origins.strip() and raw_allowed_origins.strip() != "*":
     allowed_origins = [origin.strip() for origin in raw_allowed_origins.split(",") if origin.strip()]
 else:
-    # Default safe origins for local development (Flask server and local frontend servers)
-    allowed_origins = [
-        "http://127.0.0.1:5000",
-        "http://localhost:5000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3000",
-        "http://127.0.0.1:5500",
-        "http://localhost:5500"
-    ]
+    allowed_origins = "*"
 
 CORS(
     app,
     resources={r"/api/*": {"origins": allowed_origins}},
-    supports_credentials=True,
     methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"]
 )
@@ -154,13 +144,13 @@ SAMPLE_PUZZLES = {
 # Frontend Serving Routes
 # ==========================================
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET"], strict_slashes=False)
 def index():
     """Serves the main frontend single-page application."""
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
-@app.route("/healthz", methods=["GET"])
+@app.route("/healthz", methods=["GET"], strict_slashes=False)
 def health_check():
     """Health check endpoint for Render and uptime monitoring."""
     return jsonify({"status": "ok"}), 200
@@ -170,7 +160,7 @@ def health_check():
 # Solver and API Endpoints
 # ==========================================
 
-@app.route("/api/examples", methods=["GET"])
+@app.route("/api/examples", methods=["GET"], strict_slashes=False)
 def get_examples():
     """Returns curated example puzzles."""
     return jsonify({
@@ -179,7 +169,7 @@ def get_examples():
     })
 
 
-@app.route("/api/source", methods=["GET"])
+@app.route("/api/source", methods=["GET"], strict_slashes=False)
 def get_solver_source():
     """
     Safely retrieves the genuine Python source code of the selected solver.
@@ -220,7 +210,7 @@ def get_solver_source():
         }), 500
 
 
-@app.route("/api/solve", methods=["POST"])
+@app.route("/api/solve", methods=["POST"], strict_slashes=False)
 def solve():
     """
     Solves a Sudoku puzzle using the requested algorithm.
@@ -303,7 +293,7 @@ def solve():
     }), 200
 
 
-@app.route("/api/compare", methods=["POST"])
+@app.route("/api/compare", methods=["POST"], strict_slashes=False)
 def compare():
     """
     Executes BOTH algorithms on the exact same Sudoku puzzle input.
@@ -408,6 +398,8 @@ def compare():
 @app.route("/<path:path>", methods=["GET"])
 def static_files(path):
     """Serves static CSS, JS, and asset files securely from frontend/."""
+    if path.startswith("api/"):
+        return jsonify({"status": "error", "message": f"API endpoint '/{path}' not found"}), 404
     file_path = os.path.join(FRONTEND_DIR, path)
     if os.path.isfile(file_path):
         return send_from_directory(FRONTEND_DIR, path)

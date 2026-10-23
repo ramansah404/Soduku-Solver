@@ -270,6 +270,10 @@ class TestFlaskAPI(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data["status"], "ok")
 
+        # Test trailing slash compatibility
+        res_slash = self.client.get("/healthz/")
+        self.assertEqual(res_slash.status_code, 200)
+
     def test_examples_route(self):
         response = self.client.get("/api/examples")
         self.assertEqual(response.status_code, 200)
@@ -277,6 +281,12 @@ class TestFlaskAPI(unittest.TestCase):
         self.assertEqual(data["status"], "success")
         self.assertIn("easy", data["examples"])
         self.assertIn("hard", data["examples"])
+
+        # Test trailing slash compatibility
+        res_slash = self.client.get("/api/examples/")
+        self.assertEqual(res_slash.status_code, 200)
+        data_slash = res_slash.get_json()
+        self.assertEqual(data_slash["status"], "success")
 
     def test_solve_backtracking_api(self):
         response = self.client.post("/api/solve", json={
