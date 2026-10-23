@@ -406,6 +406,19 @@ class TestFlaskAPI(unittest.TestCase):
         self.assertEqual(len(result["trace"][0]["board_snapshot"]), 9)
         self.assertEqual(len(result["trace"][0]["board_snapshot"][0]), 9)
 
+        # Verify trace events carry distinct, valid line numbers (not all stuck on one line)
+        lines = [step["line"] for step in result["trace"]]
+        self.assertGreater(len(set(lines)), 3, "Trace must have multiple distinct line numbers")
+
+        # Verify each line points to valid non-empty source code in backtracking.py
+        with open(os.path.join(BASE_DIR, "backend", "solver", "backtracking.py"), "r", encoding="utf-8") as f:
+            bt_code_lines = f.readlines()
+        for step in result["trace"]:
+            line_no = step["line"]
+            self.assertGreaterEqual(line_no, 1)
+            self.assertLessEqual(line_no, len(bt_code_lines))
+            self.assertTrue(len(bt_code_lines[line_no - 1].strip()) > 0)
+
     def test_trace_events_completeness_improved(self):
         result = solve_improved(self.valid_puzzle, record_trace=True, max_trace_steps=100)
         trace_types = {step["type"] for step in result["trace"]}
@@ -414,6 +427,19 @@ class TestFlaskAPI(unittest.TestCase):
         # Either naked_single or select_mrv or place_number
         self.assertTrue(bool(trace_types.intersection({"select_mrv", "place_number", "naked_single"})))
 
+        # Verify trace events carry distinct, valid line numbers
+        lines = [step["line"] for step in result["trace"]]
+        self.assertGreater(len(set(lines)), 3, "Trace must have multiple distinct line numbers")
+
+        # Verify each line points to valid non-empty source code in improved_solver.py
+        with open(os.path.join(BASE_DIR, "backend", "solver", "improved_solver.py"), "r", encoding="utf-8") as f:
+            imp_code_lines = f.readlines()
+        for step in result["trace"]:
+            line_no = step["line"]
+            self.assertGreaterEqual(line_no, 1)
+            self.assertLessEqual(line_no, len(imp_code_lines))
+            self.assertTrue(len(imp_code_lines[line_no - 1].strip()) > 0)
+
     def test_get_source_code_api(self):
         # Backtracking source
         res_bt = self.client.get("/api/source?solver=backtracking")
@@ -421,6 +447,7 @@ class TestFlaskAPI(unittest.TestCase):
         data_bt = res_bt.get_json()
         self.assertEqual(data_bt["status"], "success")
         self.assertIn("def solve_backtracking", data_bt["code"])
+        self.assertEqual(data_bt["filename"], "backend/solver/backtracking.py")
 
         # Improved source
         res_imp = self.client.get("/api/source?solver=improved")
@@ -428,6 +455,7 @@ class TestFlaskAPI(unittest.TestCase):
         data_imp = res_imp.get_json()
         self.assertEqual(data_imp["status"], "success")
         self.assertIn("def solve_improved", data_imp["code"])
+        self.assertEqual(data_imp["filename"], "backend/solver/improved_solver.py")
 
     def test_get_source_security_whitelist(self):
         # Attempting arbitrary file access or invalid parameter

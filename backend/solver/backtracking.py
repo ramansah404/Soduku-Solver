@@ -159,7 +159,7 @@ def solve_backtracking(
                 record_event(
                     "failed_choice", row, col, num,
                     f"Candidate {num} rejected: violates row, column, or box constraint",
-                    130
+                    160
                 )
 
         return False

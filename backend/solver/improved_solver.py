@@ -229,7 +229,7 @@ def solve_improved(
         mrv_cell = select_mrv_cell(domains)
         if mrv_cell is None:
             # All cells have exactly 1 candidate and no contradictions -> Solved!
-            record_event("solved", -1, -1, 0, "Puzzle successfully solved via MRV & Propagation!", 232, domains)
+            record_event("solved", -1, -1, 0, "Puzzle successfully solved via MRV & Propagation!", 233, domains)
             return domains
 
         r, c = mrv_cell
@@ -266,7 +266,7 @@ def solve_improved(
             record_event(
                 "backtrack", r, c, candidate,
                 f"Dead end with candidate {candidate} at ({r + 1}, {c + 1}). Backtracking...",
-                265,
+                273,
                 domains
             )
 

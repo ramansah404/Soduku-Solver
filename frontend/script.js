@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadExamplesFromAPI();
     loadSourceCode('improved');
+    loadSourceCode('backtracking');
     updateAlgoExplanation('improved');
 });
 
@@ -270,6 +271,8 @@ function setupEventListeners() {
         if (state.isPlaying) {
             pauseVisualization();
             startVisualizationPlayback();
+        } else if (state.trace && state.trace.length > 0) {
+            updateVisualizationStep(true);
         }
     });
 
@@ -311,9 +314,6 @@ function switchSourceTab(algo) {
     document.getElementById('tab-backtracking').classList.toggle('active', algo === 'backtracking');
     updateAlgoExplanation(algo);
 
-    // Clear stale highlight immediately so other file does not show false active line
-    highlightCodeLine(null);
-
     // Reset scroll position to top when switching files unless active trace restores it
     const scrollArea = document.getElementById('code-scroll-area');
     if (scrollArea && (!state.trace || state.trace.length === 0 || state.activeSourceView !== state.traceAlgorithm)) {
@@ -321,6 +321,16 @@ function switchSourceTab(algo) {
     }
 
     loadSourceCode(algo);
+
+    // If switching to the algorithm currently being traced, re-sync highlight immediately
+    if (state.trace && state.trace.length > 0 && state.activeSourceView === state.traceAlgorithm) {
+        const currentStep = state.trace[state.currentStepIndex];
+        if (currentStep && currentStep.line) {
+            highlightCodeLine(currentStep.line, true);
+        }
+    } else {
+        highlightCodeLine(null);
+    }
 }
 
 function updateAlgoExplanation(algo) {
@@ -426,21 +436,31 @@ function renderSource(code) {
     }
 }
 
-function highlightCodeLine(lineNum) {
+function highlightCodeLine(lineNum, smooth = false) {
     // Clear previous highlighted lines
     document.querySelectorAll('.code-line-row.highlighted').forEach(el => el.classList.remove('highlighted'));
 
     const badge = document.getElementById('active-line-badge');
 
+    // Parse and validate line number metadata gracefully (Requirement 7)
+    const parsedLine = parseInt(lineNum, 10);
+    const hasValidLine = !isNaN(parsedLine) && parsedLine > 0;
+
     // If no line number, idle state, or currently looking at a different file than the active trace
-    if (!lineNum || lineNum < 1 || (state.trace && state.trace.length > 0 && state.activeSourceView !== state.traceAlgorithm)) {
-        if (badge) badge.textContent = 'Line: Idle';
+    if (!hasValidLine || (state.trace && state.trace.length > 0 && state.activeSourceView !== state.traceAlgorithm)) {
+        if (badge) {
+            if (state.trace && state.trace.length > 0 && state.activeSourceView !== state.traceAlgorithm) {
+                badge.textContent = `Line: Idle (Viewing ${state.activeSourceView === 'improved' ? 'MRV' : 'Backtracking'})`;
+            } else {
+                badge.textContent = 'Line: Idle';
+            }
+        }
         return;
     }
 
-    if (badge) badge.textContent = `Line: ${lineNum}`;
+    if (badge) badge.textContent = `Line: ${parsedLine}`;
 
-    const targetRow = document.getElementById(`code-line-${lineNum}`);
+    const targetRow = document.getElementById(`code-line-${parsedLine}`);
     const scrollArea = document.getElementById('code-scroll-area');
 
     if (targetRow && scrollArea) {
@@ -454,7 +474,7 @@ function highlightCodeLine(lineNum) {
 
         scrollArea.scrollTo({
             top: Math.max(0, targetScrollTop),
-            behavior: 'smooth'
+            behavior: smooth ? 'smooth' : 'auto'
         });
     }
 }
@@ -605,14 +625,19 @@ function initVisualization(traceEvents, isCapped = false) {
     // Switch to active algorithm source viewer to highlight matching lines
     switchSourceTab(state.selectedAlgorithm);
 
-    updateVisualizationStep();
+    updateVisualizationStep(true);
     startVisualizationPlayback();
 }
 
-function updateVisualizationStep() {
+function updateVisualizationStep(smooth = false) {
     if (!state.trace || state.trace.length === 0) return;
 
+    if (state.currentStepIndex < 0) state.currentStepIndex = 0;
+    if (state.currentStepIndex >= state.trace.length) state.currentStepIndex = state.trace.length - 1;
+
     const step = state.trace[state.currentStepIndex];
+    if (!step) return;
+
     const total = state.trace.length;
 
     // Update Counter & Description with explicit capped indicator if applicable
@@ -621,7 +646,7 @@ function updateVisualizationStep() {
         counterText += ' (Trace capped at 600 events)';
     }
     document.getElementById('vis-step-counter').textContent = counterText;
-    document.getElementById('vis-description').textContent = step.message;
+    document.getElementById('vis-description').textContent = step.message || '';
 
     // Update Board Snapshot
     if (step.board_snapshot) {
@@ -664,7 +689,7 @@ function updateVisualizationStep() {
 
     // Highlight genuine source line only if viewing the algorithm being traced
     if (state.activeSourceView === state.traceAlgorithm) {
-        highlightCodeLine(step.line);
+        highlightCodeLine(step.line, smooth);
     } else {
         highlightCodeLine(null);
     }
@@ -678,7 +703,7 @@ function startVisualizationPlayback() {
     state.playTimer = setInterval(() => {
         if (state.currentStepIndex < state.trace.length - 1) {
             state.currentStepIndex++;
-            updateVisualizationStep();
+            updateVisualizationStep(false);
         } else {
             pauseVisualization();
         }
@@ -692,6 +717,9 @@ function pauseVisualization() {
         state.playTimer = null;
     }
     document.getElementById('vis-btn-play').innerHTML = '&#9658;'; // Play icon
+    if (state.trace && state.trace.length > 0) {
+        updateVisualizationStep(true);
+    }
 }
 
 function togglePlayPause() {
@@ -701,6 +729,7 @@ function togglePlayPause() {
         if (state.currentStepIndex >= state.trace.length - 1) {
             state.currentStepIndex = 0;
         }
+        updateVisualizationStep(true);
         startVisualizationPlayback();
     }
 }
@@ -709,7 +738,7 @@ function stepForward() {
     pauseVisualization();
     if (state.currentStepIndex < state.trace.length - 1) {
         state.currentStepIndex++;
-        updateVisualizationStep();
+        updateVisualizationStep(true);
     }
 }
 
@@ -717,20 +746,20 @@ function stepBackward() {
     pauseVisualization();
     if (state.currentStepIndex > 0) {
         state.currentStepIndex--;
-        updateVisualizationStep();
+        updateVisualizationStep(true);
     }
 }
 
 function jumpToStart() {
     pauseVisualization();
     state.currentStepIndex = 0;
-    updateVisualizationStep();
+    updateVisualizationStep(true);
 }
 
 function jumpToEnd() {
     pauseVisualization();
     state.currentStepIndex = state.trace.length > 0 ? state.trace.length - 1 : 0;
-    updateVisualizationStep();
+    updateVisualizationStep(true);
 }
 
 function stopVisualization() {
